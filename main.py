@@ -34,16 +34,18 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# === قائمة النماذج المجانية الاحتياطية (Auto Fallback) ===
+# === قائمة النماذج المجانية المستقرة والواسعة ===
 FREE_MODELS_POOL = [
+    "google/gemma-2-9b-it:free",
     "meta-llama/llama-3.1-8b-instruct:free",
     "qwen/qwen-2.5-72b-instruct:free",
     "mistralai/mistral-7b-instruct:free",
     "google/gemini-2.0-flash-lite-preview-02-05:free",
-    "meta-llama/llama-3.2-3b-instruct:free"
+    "openchat/openchat-7b:free",
+    "gryphe/mythomax-l2-13b:free"
 ]
 
-# === دالة الذكاء الاصطناعي الذكية التي تجرب الموديلات تلقائياً ===
+# === دالة الذكاء الاصطناعي مع كاشف أخطاء تفصيلي ===
 def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
     if not OPENROUTER_API_KEY:
         return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY في إعدادات Render."
@@ -58,7 +60,9 @@ def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
         "X-Title": "Farhood Agent Swarm"
     }
     
-    # تجرب الموديلات بالسرعة واحد تلو الآخر حتى ينجح واحد منها
+    last_error_details = ""
+
+    # تجربة النماذج واحداً تلو الآخر
     for model in FREE_MODELS_POOL:
         payload = {
             "model": model,
@@ -68,23 +72,28 @@ def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
             ]
         }
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=25)
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
             res_data = response.json()
             
             if response.status_code == 200 and "choices" in res_data:
-                # نجح النموذج!
                 return res_data["choices"][0]["message"]["content"]
-        except Exception:
-            continue  # إذا فشل هذا النموذج يجرب التالي فوراً
+            else:
+                if "error" in res_data:
+                    last_error_details = f"[{model}]: {res_data['error'].get('message', '')}"
+                else:
+                    last_error_details = f"[{model}]: Status Code {response.status_code}"
+        except Exception as e:
+            last_error_details = f"[{model}]: {str(e)}"
+            continue
 
-    return "⚠️ جميع النماذج المجانية مشغولة حالياً، يرجى المحاولة بعد قليل."
+    return f"⚠️ فشلت المحاولات مع النماذج المجانية.\nآخر تفاصيل للخطأ: {last_error_details}"
 
 # === أوامر البوت ===
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "🚀 أهلاً بك في شبكة Farhood Agents العملاقة!\n\n"
-        "الشبكة تعمل الآن بنظام (Auto-Fallback) الذكي للحفاظ على الخدمة مجانية 100% وبدون انقطاع.\n\n"
-        "اكتب لي أي أمر وسيقوم الفريق بالتحليل والتنفيذ فوراً!"
+        "الشبكة تعمل بنظام (Auto-Fallback) مع 7 نماذج ذكاء مجانية سريعة.\n\n"
+        "اكتب لي أي طلب وسيقوم الفريق بالتحليل والتنفيذ فوراً!"
     )
     await update.message.reply_text(welcome_text)
 
@@ -140,4 +149,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
+    
