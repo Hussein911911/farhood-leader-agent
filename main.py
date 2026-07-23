@@ -34,16 +34,17 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# === أقوى النماذج المجانية المضمونة 100% على OpenRouter ===
-AGENT_MODELS = {
-    "Leader": "google/gemini-2.0-flash-exp:free",
-    "Dev": "deepseek/deepseek-r1:free",
-    "Media": "google/gemini-2.0-flash-exp:free",
-    "Publisher": "meta-llama/llama-3.1-8b-instruct:free"
-}
+# === قائمة النماذج المجانية الاحتياطية (Auto Fallback) ===
+FREE_MODELS_POOL = [
+    "meta-llama/llama-3.1-8b-instruct:free",
+    "qwen/qwen-2.5-72b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+    "google/gemini-2.0-flash-lite-preview-02-05:free",
+    "meta-llama/llama-3.2-3b-instruct:free"
+]
 
-# === دالة الاتصال المباشر بـ OpenRouter ===
-def call_ai_agent(model_name: str, system_prompt: str, user_prompt: str) -> str:
+# === دالة الذكاء الاصطناعي الذكية التي تجرب الموديلات تلقائياً ===
+def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
     if not OPENROUTER_API_KEY:
         return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY في إعدادات Render."
     
@@ -57,61 +58,55 @@ def call_ai_agent(model_name: str, system_prompt: str, user_prompt: str) -> str:
         "X-Title": "Farhood Agent Swarm"
     }
     
-    payload = {
-        "model": model_name,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=60)
-        res_data = response.json()
-        
-        if response.status_code == 200 and "choices" in res_data:
-            return res_data["choices"][0]["message"]["content"]
-        elif "error" in res_data:
-            err_msg = res_data["error"].get("message", str(res_data["error"]))
-            return f"⚠️ خطأ من OpenRouter ({model_name}): {err_msg}"
-        else:
-            return f"⚠️ استجابة غير متوقعة ({response.status_code}): {response.text}"
+    # تجرب الموديلات بالسرعة واحد تلو الآخر حتى ينجح واحد منها
+    for model in FREE_MODELS_POOL:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        }
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=25)
+            res_data = response.json()
             
-    except Exception as e:
-        return f"⚠️ خطأ أثناء الاتصال بالشبكة: {str(e)}"
+            if response.status_code == 200 and "choices" in res_data:
+                # نجح النموذج!
+                return res_data["choices"][0]["message"]["content"]
+        except Exception:
+            continue  # إذا فشل هذا النموذج يجرب التالي فوراً
+
+    return "⚠️ جميع النماذج المجانية مشغولة حالياً، يرجى المحاولة بعد قليل."
 
 # === أوامر البوت ===
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "🚀 أهلاً بك في شبكة Farhood Agents العملاقة (النسخة المجانية)!\n\n"
-        "تم ربط البوت بأقوى النماذج المجانية المستقرة:\n"
-        "• 🧠 Leader Agent: يُدار بـ Gemini 2.0 Flash\n"
-        "• 💻 Dev Agent: يُدار بـ DeepSeek R1\n"
-        "• 🎨 Media Agent: يُدار بـ Gemini 2.0 Flash\n"
-        "• 📡 Publisher Agent: يُدار بـ Llama 3.1 8B\n\n"
-        "اكتب لي أي أمر وسيقوم الفريق بالعمل فوراً!"
+        "🚀 أهلاً بك في شبكة Farhood Agents العملاقة!\n\n"
+        "الشبكة تعمل الآن بنظام (Auto-Fallback) الذكي للحفاظ على الخدمة مجانية 100% وبدون انقطاع.\n\n"
+        "اكتب لي أي أمر وسيقوم الفريق بالتحليل والتنفيذ فوراً!"
     )
     await update.message.reply_text(welcome_text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
-    status_msg = await update.message.reply_text("🧠 Leader Agent (Gemini 2.0 Flash) يحلل طلبك ويكلف الفريق...")
+    status_msg = await update.message.reply_text("🧠 Leader Agent يحلل طلبك ويكلف الفريق...")
 
     # 1. القائد يحلل الطلب
     leader_prompt = "أنت القائد المباشر لشبكة أيجنتس ذكاء اصطناعي. قم بتحليل طلب المستخدم وتفكيكه إلى خطوات عملية مخصصة للمطور والميديا مع توجيه واضح بأسلوب احترافي باللغة العربية."
-    leader_plan = call_ai_agent(AGENT_MODELS["Leader"], leader_prompt, user_input)
+    leader_plan = call_ai_agent_smart(leader_prompt, user_input)
 
-    await status_msg.edit_text("💻 Dev Agent (DeepSeek R1) يبني الأكواد والحل التقني...")
+    await status_msg.edit_text("💻 Dev Agent يبني الأكواد والحل التقني...")
 
     # 2. المطور ينفذ الكود
     dev_prompt = "أنت خبير البرمجة والتطوير (Dev Agent). قم بكتابة الأكواد والحلول التقنية المطلوبة وفقاً لخطة القائد بأعلى جودة وبشكل مكتمل."
-    dev_output = call_ai_agent(AGENT_MODELS["Dev"], dev_prompt, f"طلب المستخدم: {user_input}\nخطة القائد: {leader_plan}")
+    dev_output = call_ai_agent_smart(dev_prompt, f"طلب المستخدم: {user_input}\nخطة القائد: {leader_plan}")
 
     # التقرير النهائي
     final_output = (
-        f"📋 خطة القائد (Gemini 2.0 Flash):\n{leader_plan}\n\n"
+        f"📋 خطة القائد:\n{leader_plan}\n\n"
         f"⚙️ ==============================\n\n"
-        f"💻 تنفيذ المطور (DeepSeek R1):\n{dev_output}"
+        f"💻 تنفيذ المطور:\n{dev_output}"
     )
 
     # حفظ السجل في Supabase
@@ -145,4 +140,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-               
+        
