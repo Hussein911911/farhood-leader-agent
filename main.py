@@ -34,18 +34,27 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# === قائمة النماذج المجانية المستقرة والواسعة ===
-FREE_MODELS_POOL = [
-    "google/gemma-2-9b-it:free",
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "qwen/qwen-2.5-72b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "google/gemini-2.0-flash-lite-preview-02-05:free",
-    "openchat/openchat-7b:free",
-    "gryphe/mythomax-l2-13b:free"
-]
+# === دالة جلب النماذج المجانية المتاحة حياً ومباشرة من OpenRouter ===
+def get_live_free_models():
+    try:
+        res = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
+        if res.status_code == 200:
+            data = res.json().get("data", [])
+            # فلترة النماذج التي تحتوي على :free في اسمها وتعمل حالياً
+            free_models = [m["id"] for m in data if ":free" in m["id"]]
+            if free_models:
+                return free_models
+    except Exception as e:
+        print(f"Error fetching live models: {e}")
+    
+    # قائمة احتياطية طارئة
+    return [
+        "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "qwen/qwen-2.5-coder-32b-instruct:free"
+    ]
 
-# === دالة الذكاء الاصطناعي مع كاشف أخطاء تفصيلي ===
+# === دالة الذكاء الاصطناعي الذكية بالمقابلة الحية ===
 def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
     if not OPENROUTER_API_KEY:
         return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY في إعدادات Render."
@@ -60,10 +69,11 @@ def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
         "X-Title": "Farhood Agent Swarm"
     }
     
-    last_error_details = ""
+    # جلب أحدث النماذج المجانية الشغالة حالياً على OpenRouter
+    live_models = get_live_free_models()
+    last_err = ""
 
-    # تجربة النماذج واحداً تلو الآخر
-    for model in FREE_MODELS_POOL:
+    for model in live_models:
         payload = {
             "model": model,
             "messages": [
@@ -72,28 +82,26 @@ def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
             ]
         }
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response = requests.post(url, headers=headers, json=payload, timeout=25)
             res_data = response.json()
             
             if response.status_code == 200 and "choices" in res_data:
                 return res_data["choices"][0]["message"]["content"]
             else:
                 if "error" in res_data:
-                    last_error_details = f"[{model}]: {res_data['error'].get('message', '')}"
-                else:
-                    last_error_details = f"[{model}]: Status Code {response.status_code}"
+                    last_err = f"[{model}]: {res_data['error'].get('message', '')}"
         except Exception as e:
-            last_error_details = f"[{model}]: {str(e)}"
+            last_err = f"[{model}]: {str(e)}"
             continue
 
-    return f"⚠️ فشلت المحاولات مع النماذج المجانية.\nآخر تفاصيل للخطأ: {last_error_details}"
+    return f"⚠️ تعذر الاتصال بالنماذج المجانية حالياً.\nتفاصيل آخر خطأ: {last_err}"
 
 # === أوامر البوت ===
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "🚀 أهلاً بك في شبكة Farhood Agents العملاقة!\n\n"
-        "الشبكة تعمل بنظام (Auto-Fallback) مع 7 نماذج ذكاء مجانية سريعة.\n\n"
-        "اكتب لي أي طلب وسيقوم الفريق بالتحليل والتنفيذ فوراً!"
+        "الشبكة تجلب الآن أحدث النماذج المجانية المتاحة حياً وتعمل تلقائياً وبشكل مستمر.\n\n"
+        "اكتب لي أي أمر وسيقوم الفريق بالتحليل والتنفيذ فوراً!"
     )
     await update.message.reply_text(welcome_text)
 
