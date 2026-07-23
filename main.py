@@ -47,7 +47,9 @@ def call_ai_agent(model_name: str, system_prompt: str, user_prompt: str) -> str:
     if not OPENROUTER_API_KEY:
         return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY في إعدادات Render."
     
-    clean_key = OPENROUTER_API_KEY.strip()
+    # تنظيف المفتاح تلقائياً وحذف أي أسطر جديدة (\n) أو مسافات ناتجة عن اللصق بالموبايل
+    clean_key = "".join(OPENROUTER_API_KEY.split())
+    
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
