@@ -1,9 +1,10 @@
 import os
+import json
+import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from openai import OpenAI
 from supabase import create_client, Client
 
 # === المتغيرات البيئية ===
@@ -19,14 +20,6 @@ if SUPABASE_URL and SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         print(f"Supabase Connection Error: {e}")
-
-# === ربط OpenRouter API ===
-ai_client = None
-if OPENROUTER_API_KEY:
-    ai_client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=OPENROUTER_API_KEY,
-    )
 
 # === سيرفر الاستمرارية مجاناً 24/7 على Render (Health Check) ===
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -49,24 +42,43 @@ AGENT_MODELS = {
     "Publisher": "deepseek/deepseek-chat"
 }
 
+# === دالة الاتصال المباشر بـ OpenRouter عبر Requests ===
 def call_ai_agent(model_name: str, system_prompt: str, user_prompt: str) -> str:
-    if not ai_client:
+    if not OPENROUTER_API_KEY:
         return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY في إعدادات Render."
+    
+    clean_key = OPENROUTER_API_KEY.strip()
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {clean_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://farhood-agents.com",
+        "X-Title": "Farhood Agent Swarm"
+    }
+    
+    payload = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    }
+    
     try:
-        response = ai_client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            extra_headers={
-                "HTTP-Referer": "https://farhood-agents.com",
-                "X-Title": "Farhood Agent Swarm",
-            }
-        )
-        return response.choices[0].message.content
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        res_data = response.json()
+        
+        if response.status_code == 200 and "choices" in res_data:
+            return res_data["choices"][0]["message"]["content"]
+        elif "error" in res_data:
+            err_msg = res_data["error"].get("message", str(res_data["error"]))
+            return f"⚠️ خطأ من OpenRouter ({model_name}): {err_msg}"
+        else:
+            return f"⚠️ استجابة غير متوقعة ({response.status_code}): {response.text}"
+            
     except Exception as e:
-        return f"⚠️ خطأ أثناء الاتصال بالنموذج ({model_name}): {str(e)}"
+        return f"⚠️ خطأ أثناء الاتصال بالشبكة: {str(e)}"
 
 # === أوامر البوت ===
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -113,7 +125,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Supabase Log Error: {e}")
 
-    # إرسال النتيجة (تقسيم الرسالة إذا كانت طويلة جداً)
+    # إرسال النتيجة
     if len(final_output) > 4000:
         await status_msg.delete()
         for i in range(0, len(final_output), 4000):
