@@ -34,12 +34,12 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# === أقوى النماذج المجانية 100% على OpenRouter ===
+# === أقوى النماذج المجانية المضمونة 100% على OpenRouter ===
 AGENT_MODELS = {
-    "Leader": "meta-llama/llama-3.3-70b-instruct:free",
-    "Dev": "qwen/qwen-2.5-coder-32b-instruct:free",
+    "Leader": "google/gemini-2.0-flash-exp:free",
+    "Dev": "deepseek/deepseek-r1:free",
     "Media": "google/gemini-2.0-flash-exp:free",
-    "Publisher": "deepseek/deepseek-r1:free"
+    "Publisher": "meta-llama/llama-3.1-8b-instruct:free"
 }
 
 # === دالة الاتصال المباشر بـ OpenRouter ===
@@ -83,25 +83,25 @@ def call_ai_agent(model_name: str, system_prompt: str, user_prompt: str) -> str:
 # === أوامر البوت ===
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "🚀 أهلاً بك في شبكة Farhood Agents العملاقة (النسخة المجانية بالكامل)!\n\n"
-        "تم ربط البوت بأقوى النماذج المجانية عالمياً:\n"
-        "• 🧠 Leader Agent: يُدار بـ Llama 3.3 70B (التخطيط والتحليل)\n"
-        "• 💻 Dev Agent: يُدار بـ Qwen 2.5 Coder (البرمجة والتطوير)\n"
-        "• 🎨 Media Agent: يُدار بـ Gemini 2.0 Flash (المحتوى والتصميم)\n"
-        "• 📡 Publisher Agent: يُدار بـ DeepSeek R1 (الأتمتة والمعالجة)\n\n"
-        "اكتب لي أي أمر بلغة طبيعية وسيقوم الفريق بالعمل فوراً!"
+        "🚀 أهلاً بك في شبكة Farhood Agents العملاقة (النسخة المجانية)!\n\n"
+        "تم ربط البوت بأقوى النماذج المجانية المستقرة:\n"
+        "• 🧠 Leader Agent: يُدار بـ Gemini 2.0 Flash\n"
+        "• 💻 Dev Agent: يُدار بـ DeepSeek R1\n"
+        "• 🎨 Media Agent: يُدار بـ Gemini 2.0 Flash\n"
+        "• 📡 Publisher Agent: يُدار بـ Llama 3.1 8B\n\n"
+        "اكتب لي أي أمر وسيقوم الفريق بالعمل فوراً!"
     )
     await update.message.reply_text(welcome_text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
-    status_msg = await update.message.reply_text("🧠 Leader Agent (Llama 3.3 70B) يحلل طلبك ويكلف الفريق...")
+    status_msg = await update.message.reply_text("🧠 Leader Agent (Gemini 2.0 Flash) يحلل طلبك ويكلف الفريق...")
 
     # 1. القائد يحلل الطلب
     leader_prompt = "أنت القائد المباشر لشبكة أيجنتس ذكاء اصطناعي. قم بتحليل طلب المستخدم وتفكيكه إلى خطوات عملية مخصصة للمطور والميديا مع توجيه واضح بأسلوب احترافي باللغة العربية."
     leader_plan = call_ai_agent(AGENT_MODELS["Leader"], leader_prompt, user_input)
 
-    await status_msg.edit_text("💻 Dev Agent (Qwen 2.5 Coder) يبني الأكواد والحل التقني...")
+    await status_msg.edit_text("💻 Dev Agent (DeepSeek R1) يبني الأكواد والحل التقني...")
 
     # 2. المطور ينفذ الكود
     dev_prompt = "أنت خبير البرمجة والتطوير (Dev Agent). قم بكتابة الأكواد والحلول التقنية المطلوبة وفقاً لخطة القائد بأعلى جودة وبشكل مكتمل."
@@ -109,9 +109,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # التقرير النهائي
     final_output = (
-        f"📋 خطة القائد (Llama 3.3 70B):\n{leader_plan}\n\n"
+        f"📋 خطة القائد (Gemini 2.0 Flash):\n{leader_plan}\n\n"
         f"⚙️ ==============================\n\n"
-        f"💻 تنفيذ المطور (Qwen 2.5 Coder):\n{dev_output}"
+        f"💻 تنفيذ المطور (DeepSeek R1):\n{dev_output}"
     )
 
     # حفظ السجل في Supabase
@@ -145,4 +145,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+               
