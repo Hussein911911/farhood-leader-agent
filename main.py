@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import threading
+import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -34,30 +35,28 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# === دالة جلب النماذج المجانية المتاحة حياً ومباشرة من OpenRouter ===
+# === دالة جلب النماذج المجانية المتاحة حياً ===
 def get_live_free_models():
     try:
         res = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
         if res.status_code == 200:
             data = res.json().get("data", [])
-            # فلترة النماذج التي تحتوي على :free في اسمها وتعمل حالياً
             free_models = [m["id"] for m in data if ":free" in m["id"]]
             if free_models:
                 return free_models
     except Exception as e:
         print(f"Error fetching live models: {e}")
     
-    # قائمة احتياطية طارئة
     return [
         "google/gemini-2.0-flash-lite-preview-02-05:free",
         "meta-llama/llama-3.3-70b-instruct:free",
         "qwen/qwen-2.5-coder-32b-instruct:free"
     ]
 
-# === دالة الذكاء الاصطناعي الذكية بالمقابلة الحية ===
+# === دالة الذكاء الاصطناعي السريعة ===
 def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
     if not OPENROUTER_API_KEY:
-        return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY في إعدادات Render."
+        return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY."
     
     clean_key = "".join(OPENROUTER_API_KEY.split())
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -69,9 +68,7 @@ def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
         "X-Title": "Farhood Agent Swarm"
     }
     
-    # جلب أحدث النماذج المجانية الشغالة حالياً على OpenRouter
     live_models = get_live_free_models()
-    last_err = ""
 
     for model in live_models:
         payload = {
@@ -82,68 +79,66 @@ def call_ai_agent_smart(system_prompt: str, user_prompt: str) -> str:
             ]
         }
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=25)
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
             res_data = response.json()
-            
             if response.status_code == 200 and "choices" in res_data:
                 return res_data["choices"][0]["message"]["content"]
-            else:
-                if "error" in res_data:
-                    last_err = f"[{model}]: {res_data['error'].get('message', '')}"
-        except Exception as e:
-            last_err = f"[{model}]: {str(e)}"
+        except Exception:
             continue
 
-    return f"⚠️ تعذر الاتصال بالنماذج المجانية حالياً.\nتفاصيل آخر خطأ: {last_err}"
+    return "⚠️ جميع النماذج المجانية مشغولة حالياً."
 
 # === أوامر البوت ===
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "🚀 أهلاً بك في شبكة Farhood Agents العملاقة!\n\n"
-        "الشبكة تجلب الآن أحدث النماذج المجانية المتاحة حياً وتعمل تلقائياً وبشكل مستمر.\n\n"
-        "اكتب لي أي أمر وسيقوم الفريق بالتحليل والتنفيذ فوراً!"
+        "🚀 أهلاً بك في شبكة Farhood Agents السريعة!\n\n"
+        "• اطلب أي صورة (مثال: 'صورة وردة بنفسجية') وسأولدها لك فوراً 🎨\n"
+        "• اطلب أي كود أو استفسار برلمجي وسيجيبك المطور باختصار ودقة 💻"
     )
     await update.message.reply_text(welcome_text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
-    status_msg = await update.message.reply_text("🧠 Leader Agent يحلل طلبك ويكلف الفريق...")
+    image_keywords = ["صورة", "صوره", "ارسم", "صمم", "توليد صورة", "image", "draw", "picture"]
+    
+    # 🎨 إذا كان الطلب صورة: قم بتوليدها وإرسالها مباشرة!
+    if any(keyword in user_input.lower() for keyword in image_keywords):
+        status_msg = await update.message.reply_text("🎨 جاري رسم وتوليد الصورة فوراً...")
+        try:
+            # ترجمة وصياغة الوصف بالإنجليزية سريعة
+            prompt_en = call_ai_agent_smart(
+                "Translate and convert the user's image request into a high quality English image prompt. Return ONLY the prompt string, nothing else.",
+                user_input
+            )
+            
+            # توليد رابط الصورة المباشر مجاناً
+            encoded_prompt = urllib.parse.quote(prompt_en)
+            image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed=42"
+            
+            await update.message.reply_photo(photo=image_url, caption=f"🖼️ الصورة المطلوبة بناءً على طلبك:\n*{user_input}*")
+            await status_msg.delete()
+            return
+        except Exception as e:
+            await status_msg.edit_text(f"❌ حدث خطأ أثناء إنشاء الصورة: {str(e)}")
+            return
 
-    # 1. القائد يحلل الطلب
-    leader_prompt = "أنت القائد المباشر لشبكة أيجنتس ذكاء اصطناعي. قم بتحليل طلب المستخدم وتفكيكه إلى خطوات عملية مخصصة للمطور والميديا مع توجيه واضح بأسلوب احترافي باللغة العربية."
-    leader_plan = call_ai_agent_smart(leader_prompt, user_input)
+    # 💻 للطلبات البرمجية والتحليليّة: إجابة مباشرة ومختصرة بدون إنشاء تقارير عملاقة
+    status_msg = await update.message.reply_text("⚡ جاري معالجة طلبك...")
+    sys_prompt = "أنت خبير برمجي وذكاء اصطناعي. أجب على طلب المستخدم بأسلوب مباشر، مختصر، واحترافي بدون تقارير طويلة أو مقدمات غير ضرورية."
+    ai_response = call_ai_agent_smart(sys_prompt, user_input)
 
-    await status_msg.edit_text("💻 Dev Agent يبني الأكواد والحل التقني...")
-
-    # 2. المطور ينفذ الكود
-    dev_prompt = "أنت خبير البرمجة والتطوير (Dev Agent). قم بكتابة الأكواد والحلول التقنية المطلوبة وفقاً لخطة القائد بأعلى جودة وبشكل مكتمل."
-    dev_output = call_ai_agent_smart(dev_prompt, f"طلب المستخدم: {user_input}\nخطة القائد: {leader_plan}")
-
-    # التقرير النهائي
-    final_output = (
-        f"📋 خطة القائد:\n{leader_plan}\n\n"
-        f"⚙️ ==============================\n\n"
-        f"💻 تنفيذ المطور:\n{dev_output}"
-    )
-
-    # حفظ السجل في Supabase
+    # حفظ السجل
     if supabase:
         try:
             supabase.table("agent_logs").insert({
                 "user_id": str(update.effective_user.id),
                 "prompt": user_input,
-                "response": final_output
+                "response": ai_response
             }).execute()
         except Exception as e:
             print(f"Supabase Log Error: {e}")
 
-    # إرسال النتيجة
-    if len(final_output) > 4000:
-        await status_msg.delete()
-        for i in range(0, len(final_output), 4000):
-            await update.message.reply_text(final_output[i:i+4000])
-    else:
-        await status_msg.edit_text(final_output)
+    await status_msg.edit_text(ai_response)
 
 def main():
     threading.Thread(target=run_health_check_server, daemon=True).start()
@@ -157,4 +152,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+            
