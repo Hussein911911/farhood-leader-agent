@@ -34,22 +34,20 @@ def run_health_check_server():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# === النماذج الذكية المخصصة للأيجنتس ===
+# === أقوى النماذج المجانية 100% على OpenRouter ===
 AGENT_MODELS = {
-    "Leader": "openai/gpt-4o",
-    "Dev": "anthropic/claude-3.5-sonnet",
-    "Media": "google/gemini-flash-1.5",
-    "Publisher": "deepseek/deepseek-chat"
+    "Leader": "meta-llama/llama-3.3-70b-instruct:free",
+    "Dev": "qwen/qwen-2.5-coder-32b-instruct:free",
+    "Media": "google/gemini-2.0-flash-exp:free",
+    "Publisher": "deepseek/deepseek-r1:free"
 }
 
-# === دالة الاتصال المباشر بـ OpenRouter عبر Requests ===
+# === دالة الاتصال المباشر بـ OpenRouter ===
 def call_ai_agent(model_name: str, system_prompt: str, user_prompt: str) -> str:
     if not OPENROUTER_API_KEY:
         return "❌ خطأ: لم يتم إضافة مفتاح OPENROUTER_API_KEY في إعدادات Render."
     
-    # تنظيف المفتاح تلقائياً وحذف أي أسطر جديدة (\n) أو مسافات ناتجة عن اللصق بالموبايل
     clean_key = "".join(OPENROUTER_API_KEY.split())
-    
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
@@ -85,35 +83,35 @@ def call_ai_agent(model_name: str, system_prompt: str, user_prompt: str) -> str:
 # === أوامر البوت ===
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "🚀 أهلاً بك في شبكة Farhood Agents العملاقة!\n\n"
-        "تم ربط البوت بأقوى نماذج الذكاء الاصطناعي العالمية:\n"
-        "• 🧠 Leader Agent: يُدار بـ GPT-4o (التخطيط والتحليل)\n"
-        "• 💻 Dev Agent: يُدار بـ Claude 3.5 Sonnet (البرمجة والتطوير)\n"
-        "• 🎨 Media Agent: يُدار بـ Gemini 1.5 (المحتوى والتصميم)\n"
-        "• 📡 Publisher Agent: يُدار بـ DeepSeek (الأتمتة والمعالجة)\n\n"
+        "🚀 أهلاً بك في شبكة Farhood Agents العملاقة (النسخة المجانية بالكامل)!\n\n"
+        "تم ربط البوت بأقوى النماذج المجانية عالمياً:\n"
+        "• 🧠 Leader Agent: يُدار بـ Llama 3.3 70B (التخطيط والتحليل)\n"
+        "• 💻 Dev Agent: يُدار بـ Qwen 2.5 Coder (البرمجة والتطوير)\n"
+        "• 🎨 Media Agent: يُدار بـ Gemini 2.0 Flash (المحتوى والتصميم)\n"
+        "• 📡 Publisher Agent: يُدار بـ DeepSeek R1 (الأتمتة والمعالجة)\n\n"
         "اكتب لي أي أمر بلغة طبيعية وسيقوم الفريق بالعمل فوراً!"
     )
     await update.message.reply_text(welcome_text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
-    status_msg = await update.message.reply_text("🧠 Leader Agent (GPT-4o) يحلل طلبك ويكلف الفريق...")
+    status_msg = await update.message.reply_text("🧠 Leader Agent (Llama 3.3 70B) يحلل طلبك ويكلف الفريق...")
 
-    # 1. القائد (GPT-4o) يحلل الطلب
+    # 1. القائد يحلل الطلب
     leader_prompt = "أنت القائد المباشر لشبكة أيجنتس ذكاء اصطناعي. قم بتحليل طلب المستخدم وتفكيكه إلى خطوات عملية مخصصة للمطور والميديا مع توجيه واضح بأسلوب احترافي باللغة العربية."
     leader_plan = call_ai_agent(AGENT_MODELS["Leader"], leader_prompt, user_input)
 
-    await status_msg.edit_text("💻 Dev Agent (Claude 3.5 Sonnet) يبني الأكواد والحل التقني...")
+    await status_msg.edit_text("💻 Dev Agent (Qwen 2.5 Coder) يبني الأكواد والحل التقني...")
 
-    # 2. المطور (Claude 3.5 Sonnet) ينفذ الكود
+    # 2. المطور ينفذ الكود
     dev_prompt = "أنت خبير البرمجة والتطوير (Dev Agent). قم بكتابة الأكواد والحلول التقنية المطلوبة وفقاً لخطة القائد بأعلى جودة وبشكل مكتمل."
     dev_output = call_ai_agent(AGENT_MODELS["Dev"], dev_prompt, f"طلب المستخدم: {user_input}\nخطة القائد: {leader_plan}")
 
     # التقرير النهائي
     final_output = (
-        f"📋 خطة القائد (GPT-4o):\n{leader_plan}\n\n"
+        f"📋 خطة القائد (Llama 3.3 70B):\n{leader_plan}\n\n"
         f"⚙️ ==============================\n\n"
-        f"💻 تنفيذ المطور (Claude 3.5 Sonnet):\n{dev_output}"
+        f"💻 تنفيذ المطور (Qwen 2.5 Coder):\n{dev_output}"
     )
 
     # حفظ السجل في Supabase
